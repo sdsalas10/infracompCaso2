@@ -146,7 +146,7 @@ public class Buffer {
 
 
 		Properties prop = new Properties();
-		String propFileName = "config.properties";
+		String propFileName = "config9.properties";
 		InputStream inputS = Buffer.class.getClassLoader().getResourceAsStream(propFileName);
 
 		if(inputS!=null){
