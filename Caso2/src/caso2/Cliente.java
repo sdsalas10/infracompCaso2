@@ -22,6 +22,11 @@ import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.Date;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.NoSuchPaddingException;
+
 import sun.security.x509.AlgorithmId;
 import sun.security.x509.CertificateAlgorithmId;
 import sun.security.x509.CertificateSerialNumber;
@@ -115,6 +120,8 @@ public class Cliente {
 	private static String num1;
 	
 	private static String num2;
+	
+	private static KeyPair kp;
 	
 	
 	public Cliente(){
@@ -234,7 +241,15 @@ public class Cliente {
 		return certificate.getPublicKey();
 	}
 	
-	
+	public void cifrar() throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException{
+		Cipher cifrador = Cipher.getInstance("RSA");
+		cifrador.init(Cipher.ENCRYPT_MODE, kp.getPrivate());
+		byte[] mCifrado = cifrador.doFinal(num2.getBytes());
+		String capsula = Seguridad.transformar(mCifrado);
+		pw.println(capsula);
+		
+		
+	}
 	public static void main(String[] args){
 		
 		Cliente c = new Cliente();
@@ -248,18 +263,18 @@ public class Cliente {
 			String algHmac = "HMACSHA1";
 			boolean confirmado = c.enviarAlgoritmos(algAsim, algHmac);
 			
-			KeyPair kp = Seguridad.crearLlaves();
+			kp = Seguridad.crearLlaves();
 			X509Certificate certificado = c.crearCertificado(kp);
 			c.enviarCD(num1, certificado);
 			
 			PublicKey llavePublicaServ =  c.recibirCertificadoServidor();
 			
-
+			c.cifrar();
 			
 
 			
 			
-		} catch (IOException | NoSuchAlgorithmException | InvalidKeyException | IllegalStateException | NoSuchProviderException | SignatureException | CertificateException e) {
+		} catch (IOException | NoSuchAlgorithmException | InvalidKeyException | IllegalStateException | NoSuchProviderException | SignatureException | CertificateException | NoSuchPaddingException | IllegalBlockSizeException | BadPaddingException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
