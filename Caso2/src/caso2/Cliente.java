@@ -25,7 +25,11 @@ import java.util.Date;
 import javax.crypto.BadPaddingException;
 import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.KeyGenerator;
+import javax.crypto.Mac;
 import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.SecretKeySpec;
 
 import sun.security.x509.AlgorithmId;
 import sun.security.x509.CertificateAlgorithmId;
@@ -102,7 +106,7 @@ public class Cliente {
 	/*
 	 * El lector del canal
 	 */
-	private BufferedReader br;
+	private static BufferedReader br;
 	
 	/*
 	 * El escritor del canal
@@ -163,7 +167,9 @@ public class Cliente {
 		return confirmado;
 	}
 	
-	
+	/**
+	 * Crea un certificado 
+	 */
 	public X509Certificate crearCertificado(KeyPair llaves) throws InvalidKeyException, IllegalStateException, NoSuchProviderException, NoSuchAlgorithmException, SignatureException, CertificateException, IOException{
 
 		KeyPair kp = llaves;
@@ -234,45 +240,141 @@ public class Cliente {
 		System.out.println(respuesta);
 		String[] arregloRespuesta = respuesta.split(":");
 		num2 = arregloRespuesta[0];
-		pw.println(RTA+":"+OK);
+		
 		
 		CertificateFactory  cf = CertificateFactory.getInstance("X.509");
 		Certificate certificate = cf.generateCertificate(socket.getInputStream());getClass();
+		
+		pw.println(RTA+":"+OK);
+		
 		return certificate.getPublicKey();
+		
+		
+		
 	}
 	
-	public void cifrar() throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException{
-		Cipher cifrador = Cipher.getInstance("RSA");
-		cifrador.init(Cipher.ENCRYPT_MODE, kp.getPrivate());
-		byte[] mCifrado = cifrador.doFinal(num2.getBytes());
-		String capsula = Seguridad.transformar(mCifrado);
-		pw.println(capsula);
+	public String leerCifrado(PublicKey llavePublica) throws IOException, InvalidKeyException, NoSuchAlgorithmException, NoSuchPaddingException, IllegalBlockSizeException, BadPaddingException{
 		
+		String num2Cifrado = br.readLine();
+		System.out.println("Num1 Cifrado: "+num2Cifrado);
+		byte[] num2Destr = Seguridad.destransformar(num2Cifrado);
+		System.out.println("Num1 Destransformado: "+num2Destr);
+		String mensajeDescifrado = descifrar(num2Destr, llavePublica);
+		return mensajeDescifrado;
 		
 	}
+	
+	public String cifrar(PrivateKey pk, String mensaje) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException{
+		
+		Cipher cifrador = Cipher.getInstance("RSA");
+		cifrador.init(Cipher.ENCRYPT_MODE, pk);
+		byte[] mCifrado = cifrador.doFinal(mensaje.getBytes());
+		String capsula = Seguridad.transformar(mCifrado);
+		return capsula;
+		
+	}
+	
+public String cifrar(PrivateKey pk, byte[] mensaje) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException{
+		
+		Cipher cifrador = Cipher.getInstance("RSA");
+		cifrador.init(Cipher.ENCRYPT_MODE, pk);
+		byte[] mCifrado = cifrador.doFinal(mensaje);
+		String capsula = Seguridad.transformar(mCifrado);
+		return capsula;
+		
+	}
+	
+	public String descifrar(byte[] m, PublicKey llavePublica) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException{
+		Cipher descifrador = Cipher.getInstance("RSA");
+		descifrador.init(Cipher.DECRYPT_MODE, llavePublica);
+		byte[] mCifrado = descifrador.doFinal(m);
+		String mensajeDescifrado = new String (mCifrado);
+		System.out.println("Mensaje: " + mensajeDescifrado);
+		return mensajeDescifrado;
+		
+	}
+	
+	public SecretKey generarLlaveHMacSha1() throws NoSuchAlgorithmException{
+		
+		 KeyGenerator keyGen = KeyGenerator.getInstance("HmacSHA1");
+		 keyGen.init(64, new SecureRandom());
+		 SecretKey key = keyGen.generateKey();
+		 return key;
+	}
+	
+	
+	public String cifrar(PublicKey llavePublica, String mensaje) throws NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, NoSuchPaddingException{
+		
+		Cipher cifrador = Cipher.getInstance("RSA");
+		cifrador.init(Cipher.ENCRYPT_MODE, llavePublica);
+		byte[] mCifrado = cifrador.doFinal(mensaje.getBytes());
+		String capsula = Seguridad.transformar(mCifrado);
+		return capsula;
+		
+	}
+	
+	public byte[] cifrar(PublicKey llavePublica, byte[] mensaje) throws NoSuchAlgorithmException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, NoSuchPaddingException{
+		
+		Cipher cifrador = Cipher.getInstance("RSA");
+		cifrador.init(Cipher.ENCRYPT_MODE, llavePublica);
+		byte[] mCifrado = cifrador.doFinal(mensaje);
+		return mCifrado;
+		
+	}
+	
+	
+	
+	public byte[] crearHash(SecretKey key, String ordenes) throws NoSuchAlgorithmException, InvalidKeyException{
+		Mac mac = Mac.getInstance("HMACSHA1");
+		mac.init(key);
+		byte[] hash = mac.doFinal(ordenes.getBytes());
+		return hash;
+		
+	}
+	
+	
 	public static void main(String[] args){
 		
 		Cliente c = new Cliente();
 		System.out.println("Esta es la consola");
 		try {
+			
+			//Etapa 1
 			c.crearConexion();
-			
-			num1 = "1143446331";
-			
 			String algAsim = "RSA";
 			String algHmac = "HMACSHA1";
 			boolean confirmado = c.enviarAlgoritmos(algAsim, algHmac);
 			
+			//Etapa 2
+			num1 = "1143446331";
 			kp = Seguridad.crearLlaves();
 			X509Certificate certificado = c.crearCertificado(kp);
 			c.enviarCD(num1, certificado);
-			
 			PublicKey llavePublicaServ =  c.recibirCertificadoServidor();
 			
-			c.cifrar();
+			//Etapa 3
+			String mensajeDescifrado = c.leerCifrado(llavePublicaServ);
+			String capsula = c.cifrar(kp.getPrivate(), num2);                                                                                                                                                                                                                                                                                                                                                                                  
+			c.enviar(capsula);
 			
-
+			//Etapa 4
+			SecretKey k = c.generarLlaveHMacSha1();
+			byte[] mensajeCifradoP1 = c.cifrar(llavePublicaServ, k.getEncoded());
+			capsula = Seguridad.transformar(mensajeCifradoP1);
+			String mensajeCifradoP2= c.cifrar(kp.getPrivate(), capsula);
+			c.enviar("INIT:"+mensajeCifradoP2);
 			
+			String ordenes = "La orden es poner 5 a Sebastian Salas y Nicolas Rozo";
+			capsula = c.cifrar(llavePublicaServ, ordenes);
+			c.enviar(capsula);
+			
+			byte[] hash = c.crearHash(k, ordenes);
+			byte[] cifrado = c.cifrar(llavePublicaServ, hash);
+			capsula = Seguridad.transformar(cifrado);
+			c.enviar(capsula);
+			
+			String respuesta = br.readLine();
+			System.out.println(respuesta);
 			
 		} catch (IOException | NoSuchAlgorithmException | InvalidKeyException | IllegalStateException | NoSuchProviderException | SignatureException | CertificateException | NoSuchPaddingException | IllegalBlockSizeException | BadPaddingException e) {
 			// TODO Auto-generated catch block
@@ -280,6 +382,10 @@ public class Cliente {
 		}
 		
 		
+	}
+	
+	public void enviar(String mensaje){
+		pw.println(mensaje);
 	}
 
 }
