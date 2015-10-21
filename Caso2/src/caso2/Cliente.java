@@ -42,8 +42,6 @@ import sun.security.x509.X509CertImpl;
 import sun.security.x509.X509CertInfo;
 
 
-
-
 public class Cliente {
 	
 	/*
@@ -274,13 +272,22 @@ public class Cliente {
 		
 	}
 	
-public String cifrar(PrivateKey pk, byte[] mensaje) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException{
+	public String cifrar(PrivateKey pk, byte[] mensaje) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException{
 		
 		Cipher cifrador = Cipher.getInstance("RSA");
 		cifrador.init(Cipher.ENCRYPT_MODE, pk);
 		byte[] mCifrado = cifrador.doFinal(mensaje);
 		String capsula = Seguridad.transformar(mCifrado);
 		return capsula;
+		
+	}
+	
+	public byte[] cifrarSim(PrivateKey pk, byte[] mensaje) throws NoSuchAlgorithmException, NoSuchPaddingException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException{
+		
+		Cipher cifrador = Cipher.getInstance("RSA");
+		cifrador.init(Cipher.ENCRYPT_MODE, pk);
+		byte[] mCifrado = cifrador.doFinal(mensaje);
+		return mCifrado;
 		
 	}
 	
@@ -333,6 +340,17 @@ public String cifrar(PrivateKey pk, byte[] mensaje) throws NoSuchAlgorithmExcept
 	}
 	
 	
+	
+	public byte[] concat(byte[] a, byte[] b) {
+		   int aLen = a.length;
+		   int bLen = b.length;
+		   byte[] c= new byte[aLen+bLen];
+		   System.arraycopy(a, 0, c, 0, aLen);
+		   System.arraycopy(b, 0, c, aLen, bLen);
+		   return c;
+		}
+
+	
 	public static void main(String[] args){
 		
 		Cliente c = new Cliente();
@@ -359,10 +377,43 @@ public String cifrar(PrivateKey pk, byte[] mensaje) throws NoSuchAlgorithmExcept
 			
 			//Etapa 4
 			SecretKey k = c.generarLlaveHMacSha1();
-			byte[] mensajeCifradoP1 = c.cifrar(llavePublicaServ, k.getEncoded());
-			capsula = Seguridad.transformar(mensajeCifradoP1);
-			String mensajeCifradoP2= c.cifrar(kp.getPrivate(), capsula);
-			c.enviar("INIT:"+mensajeCifradoP2);
+			byte[] llaveCifrada = c.cifrar(llavePublicaServ, k.getEncoded());
+			
+			System.out.println(llaveCifrada.length);
+			
+			byte[] parte1 = new byte[117];
+			byte[] parte2 = new byte[11];
+			
+//			int j = 0;
+//			for(int i = 0; i < 127; i++){
+//				
+//				if(i<116){
+//					parte1[i] = llaveCifrada[i];
+//				}
+//				else{
+//					parte2[j] = llaveCifrada[i];
+//					j++;
+//				}	
+//			}
+			
+			for(int i = 0; i < parte1.length; i++){
+				parte1[i] = llaveCifrada[i];
+			}
+			
+			int j=0;
+			for(int i=117; i < llaveCifrada.length; i++){
+				parte2[j] = llaveCifrada[i];
+				j++;
+			}
+			
+			byte[] parte1Cifrada = c.cifrarSim(kp.getPrivate(), parte1);
+			byte[] parte2Cifrada = c.cifrarSim(kp.getPrivate(), parte2);
+			
+			byte[] mensajeFinal = c.concat(parte1Cifrada, parte2Cifrada);
+			
+			capsula = Seguridad.transformar(mensajeFinal);
+			//String mensajeCifradoP2= c.cifrar(kp.getPrivate(), capsula);
+			c.enviar("INIT:"+capsula);
 			
 			String ordenes = "La orden es poner 5 a Sebastian Salas y Nicolas Rozo";
 			capsula = c.cifrar(llavePublicaServ, ordenes);
@@ -374,7 +425,7 @@ public String cifrar(PrivateKey pk, byte[] mensaje) throws NoSuchAlgorithmExcept
 			c.enviar(capsula);
 			
 			String respuesta = br.readLine();
-			System.out.println(respuesta);
+			System.out.println("Final: "+respuesta);
 			
 		} catch (IOException | NoSuchAlgorithmException | InvalidKeyException | IllegalStateException | NoSuchProviderException | SignatureException | CertificateException | NoSuchPaddingException | IllegalBlockSizeException | BadPaddingException e) {
 			// TODO Auto-generated catch block
