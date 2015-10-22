@@ -364,11 +364,15 @@ public class Cliente {
 			boolean confirmado = c.enviarAlgoritmos(algAsim, algHmac);
 			
 			//Etapa 2
-			num1 = "1143446331";
+			
+			int num = (int) (Math.random()*100);
+		 	num1 = num+"";
 			kp = Seguridad.crearLlaves();
 			X509Certificate certificado = c.crearCertificado(kp);
 			c.enviarCD(num1, certificado);
 			PublicKey llavePublicaServ =  c.recibirCertificadoServidor();
+			
+			
 			
 			//Etapa 3
 			String mensajeDescifrado = c.leerCifrado(llavePublicaServ);
